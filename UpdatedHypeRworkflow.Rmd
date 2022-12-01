@@ -1,0 +1,122 @@
+---
+title: "HypeR Mus Musculus"
+author: "Zach Wakefield"
+date: "4/21/2022"
+output: html_document
+---
+
+
+```{r}
+
+
+
+```
+
+
+
+
+```{r setup, include=FALSE}
+
+# run the commented out lines if never performed before
+
+# install.packages("tidyverse")
+# 
+# (!require("BiocManager", quietly = TRUE))
+#      install.packages("BiocManager")
+#  BiocManager::install(version = "3.14")
+# 
+# devtools::install_github("montilab/hypeR")
+# 
+# BiocManager::install(“biomaRt”)
+# BiocManager::install("biomaRt")
+# BiocManager::install("biomaRt")
+library(tidyverse)
+library(BiocManager)
+library(biomaRt)
+library(hypeR)
+```
+
+```{r}
+
+
+## top part is for obtaining HGNC from ENSEMBL, necessary for hypeR
+## need to adjust for genome of choice during enrichment analysis
+
+geneInput <- read.table("GENELIST_PATH")$V1
+
+ensembl <- useMart('ensembl', dataset = '*genome from useMart options*')
+genes_ids <- sub('\\.[0-9]*$', '',
+  geneInput)
+gs_heatdata <- getBM(
+  attributes = c('external_gene_name', 'mgi_symbol','ensembl_gene_id'),
+  filters = 'ensembl_gene_id',
+  values = genes_ids,
+  mart = ensembl)
+
+backgroundGenes <- readRDS("BG_FILEPATH")
+
+enrList <- gs_heatdata$external_gene_name
+
+
+# mouse 
+# GO.bp <- hypeR::msigdb_gsets("Mus musculus", "C5", "GO:BP", clean=TRUE)
+# GO.cc <- hypeR::msigdb_gsets("Mus musculus", "C5", "GO:CC", clean=TRUE)
+# GO.mf <- hypeR::msigdb_gsets("Mus musculus", "C5", "GO:MF", clean=TRUE)
+
+# human
+GO.bp <- hypeR::msigdb_gsets("Homo sapiens", "C5", "GO:BP", clean=TRUE)
+GO.cc <- hypeR::msigdb_gsets("Homo sapiens", "C5", "GO:CC", clean=TRUE)
+GO.mf <- hypeR::msigdb_gsets("Homo sapiens", "C5", "GO:MF", clean=TRUE)
+genesetsC2 <- msigdb_gsets("Homo sapiens", "C2", "CP:KEGG", clean=TRUE)
+genesetsH <- msigdb_gsets("Homo sapiens", "H", clean=TRUE)
+geneset_BIOCARTA <- msigdb_gsets("Homo sapiens", "C2", "CP:BIOCARTA", clean=TRUE)
+
+
+
+fdrUse <- .05
+
+hypGOcc <- hypeR(enrList, GO.cc, background = 200, test="hypergeometric")
+hypGOmf <- hypeR(enrList, GO.mf, background = 200, test="hypergeometric")
+hypGObp <- hypeR(enrList, GO.bp, background = 200, test="hypergeometric")
+
+
+GOcc.dots <- hyp_dots(hypGOcc, fdr = fdrUse, title = "GO Cell Comp Enrichment", merge = TRUE)
+GOmf.dots <- hyp_dots(hypGOmf, fdr = fdrUse, title = "GO Mol Fxn Enrichment", merge = TRUE)
+
+GObp.dots <- hyp_dots(hypGObp, fdr = fdrUse, title = "GO Biol Proc Enrichment", merge = TRUE)
+GObp.dots
+GOcc.dots
+GOmf.dots
+
+
+hypGObp <- hypeR(enrList, GO.bp, background = 20000, test="hypergeometric")
+GObp.dots <- hyp_dots(hypGObp, fdr = fdrUse, title = "GO Biol Proc Enrichment", merge = TRUE)
+GObp.dots
+
+```
+
+
+
+## GO Cell Comp
+
+
+```{r}
+GOcc.dots
+```
+
+
+## GO Mol Fxn
+
+
+
+```{r}
+GOmf.dots
+```
+
+
+## Biol Proc
+
+
+```{r}
+GObp.dots
+```//
