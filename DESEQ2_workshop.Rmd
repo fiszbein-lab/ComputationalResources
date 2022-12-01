@@ -1,0 +1,109 @@
+---
+title: "DESEQ2"
+author: "Zach Wakefield"
+date: "12/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(BiocManager)
+library(hypeR)
+library(DESeq2)
+library(tximport)
+library(tximportData)
+```
+
+
+## from a Counts matrix for each phenotype
+
+
+```{r}
+## Numbers are assuming triplicates, adjust for number of samples
+cond1 <- read.delim() # read in count data frame for condition 1
+colnames(cond1)[3:5] <- c() # input sample titles for condition 1
+cond5 <- read.delim() # read in count data frame for condition 2
+colnames(cond5)[3:5] <- c() # input sample titles for condition 2
+
+count_mat <- inner_join(cond1, cond5, by = "*gene, exon, seqname, etc")[c(1:5, 7:9)]
+rownames(innerGates) <- innerGates$seqname
+colData <- data.frame(condition = c("cond1", "cond1", "cond1","cond5", "cond5", "cond5"), row.names = c("cond1_1", "cond1_2", "cond1_3","cond5_1", "cond5_2", "cond5_3"))
+
+
+# counts = data frame with columns as samples, colnames as sample names
+# 
+# coldata = data frame with each row containing phenotype (eg: control vs experimental)
+#           info in the first column and matching names to the colnames from counts data frame in the second column 
+#           
+# padj.i = adjusted p value to threshold based on
+# 
+# lfc.i = log fold change to threshold based on
+
+DESEQ2 <- function(counts, coldata, padj.i, lfc.i) {
+  dds <- DESeqDataSetFromMatrix(countData = counts,
+                              colData = coldata,
+                              design= ~ condition)
+  dds <- DESeq(dds)
+  resultsNames(dds)[2] # lists the coefficients
+  res <- results(dds, name=resultsNames(dds)[2])
+  # or to shrink log fold changes association with condition:
+  res <- lfcShrink(dds, coef=resultsNames(dds)[2], type="apeglm")
+  resOrdered <- res[order(res$padj),]
+  resOrdered <- resOrdered[!is.na(resOrdered$padj),]
+  res.df <- data.frame((DataFrame(resOrdered[!is.na(resOrdered$padj),])))
+  sig.res.df <- res.df[res.df$padj <= padj.i & abs(res.df$log2FoldChange) >= lfc.i,]
+  plotMA(res, ylim=c(-2,2))
+  return(list(res, sig.res.df))
+}
+
+promDS2 <- DESEQ2(count_mat, colData, .001, 1.5)
+```
+
+
+## from Kallisto
+
+```{r}
+
+## need to adjust this to your files + specific use case
+
+
+files <- file.path("*path to samples*",  c("cond1_1", "cond1_2", "cond1_3", "cond2_1", "cond2_2", "cond2_3"), "abundance.h5")
+names(files) <- paste0("sample", 1:6)
+txi.kallisto <- tximport(files, type = "kallisto", txOut = TRUE)
+sampleTable <- data.frame(condition = 
+     factor(rep(c("conditionA", "conditionB"), each = 3)))
+rownames(sampleTable) <- colnames(txi.kallisto$counts)
+
+
+# dds is now ready for DESeq() see DESeq2 vignette
+
+
+rownames(txi.kallisto$counts) <- unlist(lapply(strsplit(unlist(lapply(strsplit(rownames(txi.kallisto$counts), split = "[|]"), "[[", 2)), split = "[.]"), "[[", 1))
+rownames(txi.kallisto$abundance) <- unlist(lapply(strsplit(unlist(lapply(strsplit(rownames(txi.kallisto$abundance), split = "[|]"), "[[", 2)), split = "[.]"), "[[", 1))
+rownames(txi.kallisto$length) <- unlist(lapply(strsplit(unlist(lapply(strsplit(rownames(txi.kallisto$length), split = "[|]"), "[[", 2)), split = "[.]"), "[[", 1))
+library(DESeq2)
+
+
+
+dds <- DESeqDataSetFromTximport(txi.kallisto, sampleTable, ~condition)
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+counts(dds)
+a <- dds
+new_dds <- data.frame(gene = unlist(lapply(strsplit(rownames(counts(a)), split = "[.]"), "[[", 1)),
+                      sample1 = as.numeric(counts(dds)[,1]),
+                      sample2 = as.numeric(counts(dds)[,2]),
+                      sample3 = as.numeric(counts(dds)[,3]),
+                      sample4 = as.numeric(counts(dds)[,4]),
+                      sample5 = as.numeric(counts(dds)[,5]),
+                      sample6 = as.numeric(counts(dds)[,6]))
+new_dds2 <- aggregate(cbind(sample1, sample2, sample3, sample4, sample5, sample6) ~ gene, data = new_dds, FUN = sum, na.rm = TRUE)
+rownames(new_dds2) <- new_dds2[,1]
+new_dds2 <- new_dds2[,-1]
+
+
+
+```
+
+
+
