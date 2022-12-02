@@ -1,0 +1,25 @@
+---
+title: "parallel_looping_inR"
+author: "Zach Wakefield"
+date: "12/2/2022"
+output: html_document
+---
+
+```{r}
+
+library(foreach)
+library(doParallel)
+cl <- makePSOCKcluster(detectCores() - 2)
+registerDoParallel(cl)
+output <- foreach(i = 1:n) %dopar% {
+     output_i <- #[code for each i]#
+     output_i
+}
+
+## returns a list with output_i as each element for each value of i in the for loops
+## can change output form with inputs in the foreach statment
+## may need to load packages within the foreach loop, depending on package
+## more info by looking up foreach dopar
+
+
+```
